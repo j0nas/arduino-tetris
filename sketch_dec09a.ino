@@ -42,32 +42,68 @@ void drawText(uint16_t color) {
 #define MIN(X, Y)       (((X) < (Y)) ? (X) : (Y))
 #define BLOCK_SIZE      MIN((tft.width() - 1) / BOARD_WIDTH, (tft.height() - 1) / BOARD_HEIGHT)
 
-#define SHAPE_COUNT     2
-#define SHAPE_O         0
+#define SHAPE_COUNT     7
 
-#define SHAPE_I         1
-#define SHAPE_O         0
-#define SHAPE_J         0
-#define SHAPE_O         0
-#define SHAPE_O         0
-#define SHAPE_O         0
+#define SHAPE_I         0
+#define SHAPE_J         1
+#define SHAPE_L         2
+#define SHAPE_O         3
+#define SHAPE_S         4
+#define SHAPE_T         5
+#define SHAPE_Z         6
 
-#define SHAPE_O_COLOR   COLOR_YELLOW
 #define SHAPE_I_COLOR   COLOR_CYAN
 #define SHAPE_J_COLOR   COLOR_BLUE
 #define SHAPE_L_COLOR   COLOR_ORANGE
+#define SHAPE_O_COLOR   COLOR_YELLOW
 #define SHAPE_S_COLOR   COLOR_LIME
 #define SHAPE_T_COLOR   COLOR_PURPLE
 #define SHAPE_Z_COLOR   COLOR_RED
 
 int currentShape = 0;
 uint16_t grid[BOARD_WIDTH][BOARD_HEIGHT];
-uint16_t shape_colors[SHAPE_COUNT] = {
-  SHAPE_O_COLOR, SHAPE_I_COLOR//, SHAPE_J_COLOR, SHAPE_L_COLOR, SHAPE_S_COLOR, SHAPE_T_COLOR, SHAPE_Z_COLOR
+uint16_t shapeColors[SHAPE_COUNT];
+byte shapes[SHAPE_COUNT][4] = {
+  {
+    B0100,
+    B0100,
+    B0100,
+    B0100
+  }, {
+    B0000,
+    B0010,
+    B0010,
+    B0110
+  }, {
+    B0000,
+    B0100,
+    B0100,
+    B0110
+  }, {
+    B1100,
+    B1100,
+    B0000,
+    B0000
+  }, {
+    B0000,
+    B0000,
+    B0110,
+    B1100
+  }, {
+    B0000,
+    B0000,
+    B0010,
+    B0111
+  }, {
+    B0000,
+    B0000,
+    B0110,
+    B0011
+  }
 };
 
 uint16_t getCurrentShapeColor() {
-  return shape_colors[currentShape];
+  return shapeColors[currentShape];
 }
 
 void fillBlock(byte x, byte y, uint16_t color) {
@@ -82,36 +118,35 @@ void fillBlock(byte x, byte y, uint16_t color) {
    a = tmp;
   }*/
 
-byte shapes[SHAPE_COUNT][4] = {
-  {
-    B1100,
-    B1100,
-    B0000,
-    B0000
-  }, {
-    B0100,
-    B0100,
-    B0100,
-    B0100
-  }
-};
-
 byte getNthBit(byte c, byte n) {
   return ((c & (1 << n)) >> n);
 }
-int currentShapeXpos = 0;
-bool isShapeHittingBottom(byte shapeNumber, byte shapeXpos, byte offset) { // TODO: compensate for orientation
+
+byte getShapeHeight(byte shapeNumber) {
   byte shapeLength = 0;
+
   switch (shapeNumber) {
-    case SHAPE_O:
-      shapeLength = 2;
-      break;
     case SHAPE_I:
       shapeLength = 4;
       break;
-  }
+    case SHAPE_J:
+    case SHAPE_L:
+      shapeLength = 4;
+      break;
+    case SHAPE_O:
+    case SHAPE_S:
+    case SHAPE_T:
+    case SHAPE_Z:
+      shapeLength = 3;
+      break;
+  };
 
-  return grid[shapeXpos][offset + shapeLength] != COLOR_BLACK || (shapeLength + offset) >= BOARD_HEIGHT;
+  return shapeLength;
+}
+
+int currentShapeXpos = 0;
+bool isShapeHittingBottom(byte shapeNumber, byte shapeXpos, byte offset) { // TODO: compensate for orientation
+  return false;// grid[shapeXpos][offset + getShapeHeight(currentShape)] != COLOR_BLACK || (getShapeHeight(currentShape) + offset) >= BOARD_HEIGHT;
 }
 
 
@@ -128,14 +163,34 @@ void detectCurrentShapeCollision() {
 void gravity() {
   for (byte i = 0; i < 4; i++) {
     int x = 0;
-    // TODO: set currentShapeXpos 
+    // TODO: set currentShapeXpos
     for (byte j = 3; j != 0; j--) {
+      //if (offset > 0 && getNthBit(shapes[currentShape][i], j) == 1 && grid[x][offset - 1 + i] != COLOR_BLACK) {
+      //fillBlock(x, offset - 1 + i, COLOR_BLACK);
+      //}
+
       if (getNthBit(shapes[currentShape][i], j) == 1) {
-        if (offset > 0 && i == 0) {
-          fillBlock(x, offset - 1 + i, COLOR_BLACK);
+        //if (offset > 0 && i == 0) {
+        //fillBlock(x, offset - 1 + i, COLOR_BLACK);
+        //}
+
+        if (offset > 0 && i == 1) {
+          if (getNthBit(shapes[currentShape][i - 1], j) == 0) {
+            fillBlock(x, offset + i - 1, COLOR_BLACK);
+          }
         }
 
         fillBlock(x++, offset + i, getCurrentShapeColor());
+      }
+    }
+  }
+
+  if (offset > 0) {
+    for (int k = 0; k < 4; k++) {
+      for (int i = 3; i != 0; i--) {
+        if (getNthBit(shapes[currentShape][k], i) == 1) {
+          //     fillBlock(k, offset + k + 1, COLOR_RED);
+        }
       }
     }
   }
@@ -160,12 +215,23 @@ void setup()
   tft.fillScreen(ST7735_BLACK);
   tft.print("Orientation\nverification");
   randomSeed(analogRead(0));
+
+  shapeColors[SHAPE_I] = SHAPE_I_COLOR;
+  shapeColors[SHAPE_J] = SHAPE_J_COLOR;
+  shapeColors[SHAPE_L] = SHAPE_L_COLOR;
+  shapeColors[SHAPE_O] = SHAPE_O_COLOR;
+  shapeColors[SHAPE_S] = SHAPE_S_COLOR;
+  shapeColors[SHAPE_T] = SHAPE_T_COLOR;
+  shapeColors[SHAPE_Z] = SHAPE_Z_COLOR;
+
+  currentShape = SHAPE_J;
+
   drawGrid();
 }
 
 void loop()
 {
-  delay(300);
+  delay(800);
   gravity();
   detectCurrentShapeCollision();
 }

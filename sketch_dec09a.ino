@@ -25,9 +25,13 @@ void drawText(uint16_t color) {
 #define COLOR_GRAY      tft.Color565(112, 112, 112)
 #define COLOR_WHITE     ST7735_WHITE
 #define COLOR_BLACK     ST7735_BLACK
-#define COLOR_RED       ST7735_RED
+#define COLOR_CYAN      ST7735_CYAN
+#define COLOR_YELLOW    ST7735_YELLOW
 #define COLOR_BLUE      ST7735_BLUE
-#define COLOR_GREEN     ST7735_GREEN
+#define COLOR_ORANGE    tft.Color565(255, 165, 0)
+#define COLOR_LIME      tft.Color565(204, 255, 0)
+#define COLOR_PURPLE    tft.Color565(128,0,128)
+#define COLOR_RED       ST7735_RED
 
 #define BOARD_COLOR      COLOR_GRAY
 #define BOARD_WIDTH     10
@@ -38,7 +42,33 @@ void drawText(uint16_t color) {
 #define MIN(X, Y)       (((X) < (Y)) ? (X) : (Y))
 #define BLOCK_SIZE      MIN((tft.width() - 1) / BOARD_WIDTH, (tft.height() - 1) / BOARD_HEIGHT)
 
+#define SHAPE_COUNT     2
+#define SHAPE_O         0
+
+#define SHAPE_I         1
+#define SHAPE_O         0
+#define SHAPE_J         0
+#define SHAPE_O         0
+#define SHAPE_O         0
+#define SHAPE_O         0
+
+#define SHAPE_O_COLOR   COLOR_YELLOW
+#define SHAPE_I_COLOR   COLOR_CYAN
+#define SHAPE_J_COLOR   COLOR_BLUE
+#define SHAPE_L_COLOR   COLOR_ORANGE
+#define SHAPE_S_COLOR   COLOR_LIME
+#define SHAPE_T_COLOR   COLOR_PURPLE
+#define SHAPE_Z_COLOR   COLOR_RED
+
+int currentShape = 0;
 uint16_t grid[BOARD_WIDTH][BOARD_HEIGHT];
+uint16_t shape_colors[SHAPE_COUNT] = {
+  SHAPE_O_COLOR, SHAPE_I_COLOR//, SHAPE_J_COLOR, SHAPE_L_COLOR, SHAPE_S_COLOR, SHAPE_T_COLOR, SHAPE_Z_COLOR
+};
+
+uint16_t getCurrentShapeColor() {
+  return shape_colors[currentShape];
+}
 
 void fillBlock(byte x, byte y, uint16_t color) {
   grid[x][y] = color;
@@ -52,63 +82,65 @@ void fillBlock(byte x, byte y, uint16_t color) {
    a = tmp;
   }*/
 
-byte shapes[2][4] = {
+byte shapes[SHAPE_COUNT][4] = {
   {
     B1100,
     B1100,
     B0000,
     B0000
   }, {
-    B1000,
-    B1000,
-    B1000,
-    B1000
+    B0100,
+    B0100,
+    B0100,
+    B0100
   }
 };
 
-int currentShape = 0;
 byte getNthBit(byte c, byte n) {
   return ((c & (1 << n)) >> n);
 }
-
-bool isShapeHittingBottom(byte shapeNumber, byte offset) { // TODO: compensate for orientation
+int currentShapeXpos = 0;
+bool isShapeHittingBottom(byte shapeNumber, byte shapeXpos, byte offset) { // TODO: compensate for orientation
   byte shapeLength = 0;
   switch (shapeNumber) {
-    case 0:
+    case SHAPE_O:
       shapeLength = 2;
       break;
-    case 1:
+    case SHAPE_I:
       shapeLength = 4;
       break;
   }
 
-  return (shapeLength + offset) >= BOARD_HEIGHT;
+  return grid[shapeXpos][offset + shapeLength] != COLOR_BLACK || (shapeLength + offset) >= BOARD_HEIGHT;
+}
+
+
+
+int offset = 0;
+
+void detectCurrentShapeCollision() {
+  if (isShapeHittingBottom(currentShape, currentShapeXpos, offset - 1)) {
+    offset = 0;
+    currentShape = random(SHAPE_COUNT);
+  }
 }
 
 void gravity() {
-  static bool hitBottom = false;
-  static int offset = 0;
-  if (hitBottom) {
-    return;
-  }
-
   for (byte i = 0; i < 4; i++) {
     int x = 0;
+    // TODO: set currentShapeXpos 
     for (byte j = 3; j != 0; j--) {
       if (getNthBit(shapes[currentShape][i], j) == 1) {
         if (offset > 0 && i == 0) {
           fillBlock(x, offset - 1 + i, COLOR_BLACK);
         }
 
-        fillBlock(x++, offset + i, COLOR_RED);
+        fillBlock(x++, offset + i, getCurrentShapeColor());
       }
     }
   }
 
-  if (isShapeHittingBottom(currentShape, offset++)) {
-    hitBottom = true;
-    offset = 0;
-  }
+  offset++;
 }
 
 void drawGrid() {
@@ -116,7 +148,6 @@ void drawGrid() {
     tft.drawFastHLine(BOARD_OFFSET_X, BOARD_OFFSET_Y + (i * BLOCK_SIZE), (BLOCK_SIZE * BOARD_WIDTH), BOARD_COLOR);
   }
 
-  // Vertical lines
   for (int i = 0; i < BOARD_WIDTH + 1; i++) {
     tft.drawFastVLine(BOARD_OFFSET_X + (i * BLOCK_SIZE), BOARD_OFFSET_Y, (BLOCK_SIZE * BOARD_HEIGHT), BOARD_COLOR);
   }
@@ -126,16 +157,16 @@ void drawGrid() {
 void setup()
 {
   tft.initR(INITR_BLACKTAB);
-  delay(500);
   tft.fillScreen(ST7735_BLACK);
   tft.print("Orientation\nverification");
-  delay(1000);
+  randomSeed(analogRead(0));
   drawGrid();
 }
 
 void loop()
 {
-  delay(700);
+  delay(300);
   gravity();
+  detectCurrentShapeCollision();
 }
 

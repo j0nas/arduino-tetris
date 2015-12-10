@@ -160,42 +160,40 @@ void detectCurrentShapeCollision() {
   }
 }
 
+
+void repaintShapeTrail(int shape) {
+  bool columnsChecked[4] = {false, false, false, false};
+
+  for (byte i = 0; i < 4; i++) {
+    byte x = 0;
+    for (byte j = 0; j != 4; j++) {
+      x++;
+      if (columnsChecked[x - 1]) {
+        continue;
+      }
+      
+      if (getNthBit(shapes[shape][i], j - 1) == 1) {
+        fillBlock(x - 2, offset - 2 + i, COLOR_BLACK);
+        columnsChecked[x - 1] = true;
+      }
+    }
+  }
+}
+
 void gravity() {
   for (byte i = 0; i < 4; i++) {
     int x = 0;
     // TODO: set currentShapeXpos
-    for (byte j = 3; j != 0; j--) {
-      //if (offset > 0 && getNthBit(shapes[currentShape][i], j) == 1 && grid[x][offset - 1 + i] != COLOR_BLACK) {
-      //fillBlock(x, offset - 1 + i, COLOR_BLACK);
-      //}
-
+    for (byte j = 0; j != 4; j++) {
       if (getNthBit(shapes[currentShape][i], j) == 1) {
-        //if (offset > 0 && i == 0) {
-        //fillBlock(x, offset - 1 + i, COLOR_BLACK);
-        //}
-
-        if (offset > 0 && i == 1) {
-          if (getNthBit(shapes[currentShape][i - 1], j) == 0) {
-            fillBlock(x, offset + i - 1, COLOR_BLACK);
-          }
-        }
-
-        fillBlock(x++, offset + i, getCurrentShapeColor());
+        fillBlock(x, offset + i, getCurrentShapeColor());
       }
-    }
-  }
-
-  if (offset > 0) {
-    for (int k = 0; k < 4; k++) {
-      for (int i = 3; i != 0; i--) {
-        if (getNthBit(shapes[currentShape][k], i) == 1) {
-          //     fillBlock(k, offset + k + 1, COLOR_RED);
-        }
-      }
+      x++;
     }
   }
 
   offset++;
+  repaintShapeTrail(currentShape);
 }
 
 void drawGrid() {
@@ -224,7 +222,7 @@ void setup()
   shapeColors[SHAPE_T] = SHAPE_T_COLOR;
   shapeColors[SHAPE_Z] = SHAPE_Z_COLOR;
 
-  currentShape = SHAPE_J;
+  currentShape = SHAPE_I;
 
   drawGrid();
 }

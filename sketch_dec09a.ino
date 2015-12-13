@@ -12,17 +12,8 @@
 #define TFT_DC   9  // Data/command line for TFT
 #define TFT_RST  8  // Reset line for TFT (or connect to +5V)
 
-Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
-
-void drawText(uint16_t color) {
-  tft.setCursor(0, 0);
-  tft.setTextColor(color);
-  tft.setTextWrap(true);
-  tft.print("Lorem ipsum dolar sit amet.");
-}
-
 // Define colors to loosen coupling to screen implementation
-#define COLOR_GRAY      tft.Color565(112, 112, 112)
+#define COLOR_GRAY      tft.Color565(66, 66, 66)
 #define COLOR_WHITE     ST7735_WHITE
 #define COLOR_BLACK     ST7735_BLACK
 #define COLOR_CYAN      ST7735_CYAN
@@ -33,7 +24,9 @@ void drawText(uint16_t color) {
 #define COLOR_PURPLE    tft.Color565(128,0,128)
 #define COLOR_RED       ST7735_RED
 
-#define BOARD_COLOR      COLOR_GRAY
+#define BOARD_COLOR     COLOR_GRAY
+#define BACKGROUND_COLOR  COLOR_BLACK
+
 #define BOARD_WIDTH     10
 #define BOARD_HEIGHT    20
 #define BOARD_OFFSET_X  2
@@ -60,10 +53,12 @@ void drawText(uint16_t color) {
 #define SHAPE_T_COLOR   COLOR_PURPLE
 #define SHAPE_Z_COLOR   COLOR_RED
 
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 int currentShape = 0;
+int yOffset = -4;
 uint16_t grid[BOARD_WIDTH][BOARD_HEIGHT];
 uint16_t shapeColors[SHAPE_COUNT];
-byte shapes[SHAPE_COUNT][4] = {
+const byte shapes[SHAPE_COUNT][4] = {
   {
     B0100,
     B0100,
@@ -80,10 +75,10 @@ byte shapes[SHAPE_COUNT][4] = {
     B0100,
     B0110
   }, {
-    B1100,
-    B1100,
     B0000,
-    B0000
+    B0000,
+    B0110,
+    B0110
   }, {
     B0000,
     B0000,
@@ -111,89 +106,62 @@ void fillBlock(byte x, byte y, uint16_t color) {
   tft.fillRect(1 + BOARD_OFFSET_X + (x * BLOCK_SIZE), 1 + BOARD_OFFSET_Y + (y * BLOCK_SIZE), BLOCK_SIZE - 1, BLOCK_SIZE - 1, color);
 }
 
-/*
-  void _swap(uint16_t *a, uint16_t *b) {
-  uint16_t tmp = *b;
-   b = *a;
-   a = tmp;
-  }*/
-
 byte getNthBit(byte c, byte n) {
   return ((c & (1 << n)) >> n);
 }
 
-byte getShapeHeight(byte shapeNumber) {
-  byte shapeLength = 0;
-
-  switch (shapeNumber) {
-    case SHAPE_I:
-      shapeLength = 4;
-      break;
-    case SHAPE_J:
-    case SHAPE_L:
-      shapeLength = 4;
-      break;
-    case SHAPE_O:
-    case SHAPE_S:
-    case SHAPE_T:
-    case SHAPE_Z:
-      shapeLength = 3;
-      break;
-  };
-
-  return shapeLength;
+bool isShapeHittingBottom(byte shapeNumber, int yPos) { // TODO: compensate for orientation
+  return (4 + yOffset) >= BOARD_HEIGHT;
 }
 
-int currentShapeXpos = 0;
-bool isShapeHittingBottom(byte shapeNumber, byte shapeXpos, byte offset) { // TODO: compensate for orientation
-  return false;// grid[shapeXpos][offset + getShapeHeight(currentShape)] != COLOR_BLACK || (getShapeHeight(currentShape) + offset) >= BOARD_HEIGHT;
+bool isShapeColliding(byte shapeNumber, int yPos) {
+  if (shapeNumber == SHAPE_Z && grid[2][yPos + 3] != COLOR_BLACK) {
+    return true;
+  }
+
+  for (byte i = 0; i < 4; i++) {
+    if ((getNthBit(shapes[shapeNumber][3], i) == 1) && (grid[i][yPos + 4] != COLOR_BLACK)) {
+
+      if (yPos < -1) {
+        tft.setCursor(90, 20);
+        tft.print("GAME");
+        tft.setCursor(90, 30);
+        tft.print("OVER");
+        while (true);
+      }
+
+      return true;
+    }
+  }
+
+  return false;
 }
-
-
-
-int offset = 0;
 
 void detectCurrentShapeCollision() {
-  if (isShapeHittingBottom(currentShape, currentShapeXpos, offset - 1)) {
-    offset = 0;
+  if (isShapeHittingBottom(currentShape, yOffset) || isShapeColliding(currentShape, yOffset)) {
+    yOffset = -4;
     currentShape = random(SHAPE_COUNT);
   }
 }
 
-
-void repaintShapeTrail(int shape) {
-  bool columnsChecked[4] = {false, false, false, false};
-
-  for (byte i = 0; i < 4; i++) {
-    byte x = 0;
-    for (byte j = 0; j != 4; j++) {
-      x++;
-      if (columnsChecked[x - 1]) {
-        continue;
-      }
-      
-      if (getNthBit(shapes[shape][i], j - 1) == 1) {
-        fillBlock(x - 2, offset - 2 + i, COLOR_BLACK);
-        columnsChecked[x - 1] = true;
-      }
-    }
-  }
-}
-
 void gravity() {
-  for (byte i = 0; i < 4; i++) {
-    int x = 0;
-    // TODO: set currentShapeXpos
-    for (byte j = 0; j != 4; j++) {
-      if (getNthBit(shapes[currentShape][i], j) == 1) {
-        fillBlock(x, offset + i, getCurrentShapeColor());
+  for (byte k = 0; k < 2; k++) {
+    for (byte i = 0; i < 4; i++) {
+      int x = 0;
+      // TODO: set currentShapeXpos
+      for (byte j = 0; j != 4; j++) {
+        if (getNthBit(shapes[currentShape][i], j) == 1) {
+          fillBlock(x, yOffset + i, k == 0 ? COLOR_BLACK : getCurrentShapeColor());
+        }
+
+        x++;
       }
-      x++;
+    }
+
+    if (k == 0) {
+      yOffset++;
     }
   }
-
-  offset++;
-  repaintShapeTrail(currentShape);
 }
 
 void drawGrid() {
@@ -212,7 +180,7 @@ void setup()
   tft.initR(INITR_BLACKTAB);
   tft.fillScreen(ST7735_BLACK);
   tft.print("Orientation\nverification");
-  randomSeed(analogRead(0));
+  randomSeed(analogRead(A1));
 
   shapeColors[SHAPE_I] = SHAPE_I_COLOR;
   shapeColors[SHAPE_J] = SHAPE_J_COLOR;
@@ -223,13 +191,12 @@ void setup()
   shapeColors[SHAPE_Z] = SHAPE_Z_COLOR;
 
   currentShape = SHAPE_I;
-
   drawGrid();
 }
 
 void loop()
 {
-  delay(800);
+  delay(100);
   gravity();
   detectCurrentShapeCollision();
 }

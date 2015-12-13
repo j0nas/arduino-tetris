@@ -1,6 +1,4 @@
-
-#include <SPI.h>
-#include <Adafruit_GFX.h>
+//#include <Adafruit_GFX.h>
 #include <Adafruit_ST7735.h>
 
 // TFT display and SD card will share the hardware SPI interface.
@@ -9,8 +7,13 @@
 // Duemilanove, etc., pin 11 = MOSI, pin 12 = MISO, pin 13 = SCK.
 // #define SD_CS    4  // Chip select line for SD card
 #define TFT_CS  10  // Chip select line for TFT display
-#define TFT_DC   9  // Data/command line for TFT
-#define TFT_RST  8  // Reset line for TFT (or connect to +5V)
+#define TFT_DC  9   // Data/command line for TFT
+#define TFT_RST 8   // Reset line for TFT (or connect to +5V)
+
+#define JOY_X   A0
+#define JOY_Y   A1
+#define JOY_BTN 2
+
 
 // Define colors to loosen coupling to screen implementation
 #define COLOR_GRAY      tft.Color565(66, 66, 66)
@@ -24,7 +27,7 @@
 #define COLOR_PURPLE    tft.Color565(128,0,128)
 #define COLOR_RED       ST7735_RED
 
-#define BOARD_COLOR     COLOR_GRAY
+#define BOARD_COLOR       COLOR_GRAY
 #define BACKGROUND_COLOR  COLOR_BLACK
 
 #define BOARD_WIDTH     10
@@ -56,6 +59,7 @@
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 int currentShape = 0;
 int yOffset = -4;
+int xOffset = 0;
 uint16_t grid[BOARD_WIDTH][BOARD_HEIGHT];
 uint16_t shapeColors[SHAPE_COUNT];
 const byte shapes[SHAPE_COUNT][4] = {
@@ -114,20 +118,50 @@ bool isShapeHittingBottom(byte shapeNumber, int yPos) { // TODO: compensate for 
   return (4 + yOffset) >= BOARD_HEIGHT;
 }
 
-bool isShapeColliding(byte shapeNumber, int yPos) {
-  if (shapeNumber == SHAPE_Z && grid[2][yPos + 3] != COLOR_BLACK) {
+void nextShape() {
+  yOffset = -4;
+  xOffset = 0;
+  currentShape = random(SHAPE_COUNT);
+}
+
+void gameOver() {
+  tft.setCursor(90, 20);
+  tft.print("GAME");
+  tft.setCursor(90, 30);
+  tft.print("OVER");
+  while (true) {
+    bool isClicked = (digitalRead(JOY_BTN) == LOW);
+    if (isClicked) {
+      delay(150);
+      isClicked = (digitalRead(JOY_BTN) == LOW);
+    }
+
+    if (isClicked) {
+      tft.fillRect(90, 20, 25, 20, COLOR_BLACK);
+      for (byte i = 0; i < BOARD_WIDTH; i++) {
+        for (byte j = 0; j < BOARD_HEIGHT; j++) {
+          fillBlock(i, j, COLOR_BLACK);
+        }
+      }
+
+      nextShape();
+      break;
+    }
+
+    delay(100);
+  }
+
+}
+
+bool isShapeColliding(byte shapeNumber, int xPos, int yPos) {
+  if (shapeNumber == SHAPE_Z && grid[xPos + 2][yPos + 3] != COLOR_BLACK) {
     return true;
   }
 
   for (byte i = 0; i < 4; i++) {
-    if ((getNthBit(shapes[shapeNumber][3], i) == 1) && (grid[i][yPos + 4] != COLOR_BLACK)) {
-
+    if ((getNthBit(shapes[shapeNumber][3], i) == 1) && (grid[xPos + i][yPos + 4] != COLOR_BLACK)) {
       if (yPos < -1) {
-        tft.setCursor(90, 20);
-        tft.print("GAME");
-        tft.setCursor(90, 30);
-        tft.print("OVER");
-        while (true);
+        gameOver();
       }
 
       return true;
@@ -138,20 +172,21 @@ bool isShapeColliding(byte shapeNumber, int yPos) {
 }
 
 void detectCurrentShapeCollision() {
-  if (isShapeHittingBottom(currentShape, yOffset) || isShapeColliding(currentShape, yOffset)) {
-    yOffset = -4;
-    currentShape = random(SHAPE_COUNT);
+  if (isShapeHittingBottom(currentShape, yOffset) || isShapeColliding(currentShape, xOffset, yOffset)) {
+    nextShape();
   }
 }
 
 void gravity() {
+  static byte lastXoffset = 0;
+
   for (byte k = 0; k < 2; k++) {
     for (byte i = 0; i < 4; i++) {
       int x = 0;
       // TODO: set currentShapeXpos
       for (byte j = 0; j != 4; j++) {
         if (getNthBit(shapes[currentShape][i], j) == 1) {
-          fillBlock(x, yOffset + i, k == 0 ? COLOR_BLACK : getCurrentShapeColor());
+          fillBlock((k == 0 ? lastXoffset : xOffset) + x, yOffset + i, k == 0 ? COLOR_BLACK : getCurrentShapeColor());
         }
 
         x++;
@@ -161,6 +196,10 @@ void gravity() {
     if (k == 0) {
       yOffset++;
     }
+  }
+
+  if (xOffset != lastXoffset) {
+    lastXoffset = xOffset;
   }
 }
 
@@ -174,13 +213,31 @@ void drawGrid() {
   }
 }
 
+void joystickMovement() {
+  int joyX = analogRead(JOY_X);
+  //int joyY = analogRead(JOY_Y);
 
-void setup()
-{
+  // left
+  if (joyX == 0 && xOffset > -1) { // todo: allow moving according to tile width
+    xOffset--;
+  }
+
+  // right
+  if (joyX > 1015 && xOffset < BOARD_WIDTH - 3) {
+    xOffset++;
+  }
+}
+
+void setup() {
   tft.initR(INITR_BLACKTAB);
   tft.fillScreen(ST7735_BLACK);
   tft.print("Orientation\nverification");
-  randomSeed(analogRead(A1));
+
+  pinMode(JOY_BTN, INPUT_PULLUP);
+  pinMode(JOY_X, INPUT);
+  pinMode(JOY_Y, INPUT);
+
+  randomSeed(analogRead(A2));
 
   shapeColors[SHAPE_I] = SHAPE_I_COLOR;
   shapeColors[SHAPE_J] = SHAPE_J_COLOR;
@@ -189,15 +246,15 @@ void setup()
   shapeColors[SHAPE_S] = SHAPE_S_COLOR;
   shapeColors[SHAPE_T] = SHAPE_T_COLOR;
   shapeColors[SHAPE_Z] = SHAPE_Z_COLOR;
-
-  currentShape = SHAPE_I;
+  
   drawGrid();
+  nextShape();
 }
 
-void loop()
-{
-  delay(100);
+void loop() {
+  delay(300);
   gravity();
   detectCurrentShapeCollision();
+  joystickMovement();
 }
 

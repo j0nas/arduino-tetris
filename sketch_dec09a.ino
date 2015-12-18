@@ -56,6 +56,7 @@
 #define SHAPE_Z_COLOR   COLOR_RED
 
 #define MOVE_DELAY 85
+#define DOWN_DELAY 100
 
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 byte currentShape = 0;
@@ -65,6 +66,9 @@ short lastY = -4;
 short lastX = 0;
 
 short level = 300;
+unsigned long stamp = 0;
+unsigned long lastDown = 0;
+
 uint16_t grid[BOARD_WIDTH][BOARD_HEIGHT];
 uint16_t shapeColors[SHAPE_COUNT];
 const byte shapes[SHAPE_COUNT][4] = {
@@ -155,7 +159,6 @@ void gameOver() {
 
     delay(100);
   }
-
 }
 
 bool isShapeColliding(byte shapeNumber, int xPos, int yPos) {
@@ -218,25 +221,77 @@ void drawGrid() {
   }
 }
 
+short getShapeLeftWidth() {
+  switch (currentShape) {
+    case SHAPE_I:
+      return -2;
+    case SHAPE_S:
+      return -1;
+
+    case SHAPE_J:
+    case SHAPE_L:
+    case SHAPE_O:
+      return -1;
+
+    case SHAPE_T:
+      return 0;
+
+    case SHAPE_Z:
+      return 0;
+  }
+
+}
+
+byte getShapeWidth() {
+  return currentShape == SHAPE_S ? 4 : 3;
+  /*
+    switch (currentShape) {
+      case SHAPE_I:
+        return 3;
+      case SHAPE_J:
+      case SHAPE_L:
+      case SHAPE_O:
+        return 3;
+      case SHAPE_T:
+      case SHAPE_Z:
+        return 3;
+      case SHAPE_S:
+        return 4;
+    }
+  */
+}
+
 void joystickMovement() {
   int joyX = analogRead(JOY_X);
+  int joyY = analogRead(JOY_Y);
+  unsigned long now = millis();
+
   static unsigned long lastMove = millis();
-  //int joyY = analogRead(JOY_Y);
+  static short lastYoffset = yOffset;
 
   // left
-  if (joyX == 0 && xOffset > -1 && (millis() - lastMove) > MOVE_DELAY) { // todo: allow moving according to tile width
-    lastMove = millis();
+  if (joyX == 0 && xOffset > getShapeLeftWidth() && (now - lastMove) > MOVE_DELAY) { // todo: allow moving according to tile width
+    lastMove = now;
     xOffset--;
   }
 
   // right
-  if (joyX > 1015 && xOffset < BOARD_WIDTH - 3 && (millis() - lastMove) > MOVE_DELAY) {
-    lastMove = millis();
+  if (joyX > 500 && xOffset < BOARD_WIDTH - getShapeWidth() && (now - lastMove) > MOVE_DELAY) {
+    lastMove = now;
     xOffset++;
   }
-}
 
-unsigned long stamp = 0;
+  // down
+  if (yOffset < lastYoffset && !(joyY > 280 && joyY < 310)) {
+    return;
+  }
+  
+  lastYoffset = yOffset;
+  if (joyY > 500 && lastDown - now > DOWN_DELAY) {
+    stamp -= level;
+    lastDown = now;
+  }
+}
 
 void setup() {
   tft.initR(INITR_BLACKTAB);
@@ -273,7 +328,7 @@ void loop() {
     lastX = xOffset;
     lastY = yOffset;
   }
-  
+
   joystickMovement();
 }
 

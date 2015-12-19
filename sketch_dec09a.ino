@@ -56,7 +56,7 @@
 #define SHAPE_Z_COLOR   COLOR_RED
 
 #define MOVE_DELAY 85
-#define DOWN_DELAY 100
+#define DOWN_DELAY 150
 
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 byte currentShape = 0;
@@ -244,21 +244,29 @@ short getShapeLeftWidth() {
 
 byte getShapeWidth() {
   return currentShape == SHAPE_S ? 4 : 3;
-  /*
-    switch (currentShape) {
-      case SHAPE_I:
-        return 3;
-      case SHAPE_J:
-      case SHAPE_L:
-      case SHAPE_O:
-        return 3;
-      case SHAPE_T:
-      case SHAPE_Z:
-        return 3;
-      case SHAPE_S:
-        return 4;
+}
+
+bool canMove(bool left) {
+  short predictedShapePositions[4];
+  for (byte i = 0; i < 4; i++) {
+    predictedShapePositions[i] =
+      left ?
+      ((shapes[currentShape][i] >> 1) - (shapes[currentShape][i] & (shapes[currentShape][i] >> 1))) :
+      ((shapes[currentShape][i] << 1) - (shapes[currentShape][i] & (shapes[currentShape][i] << 1)));
+  }
+
+  for (byte i = 0; i < 4; i++) {
+    byte x = 0;
+    for (byte j = 0; j != 4; j++) {
+      if ((getNthBit(predictedShapePositions[i], j) == 1) && (grid[xOffset + x][yOffset + i] != COLOR_BLACK)) {
+        return false;
+      }
+
+      x++;
     }
-  */
+  }
+
+  return true;
 }
 
 void joystickMovement() {
@@ -270,24 +278,28 @@ void joystickMovement() {
   static short lastYoffset = yOffset;
 
   // left
-  if (joyX == 0 && xOffset > getShapeLeftWidth() && (now - lastMove) > MOVE_DELAY) { // todo: allow moving according to tile width
-    lastMove = now;
-    xOffset--;
+  if (joyX == 0 && xOffset > getShapeLeftWidth() && (now - lastMove) > MOVE_DELAY) {
+    if (canMove(true)) {
+      lastMove = now;
+      xOffset--;
+    }
   }
 
   // right
-  if (joyX > 500 && xOffset < BOARD_WIDTH - getShapeWidth() && (now - lastMove) > MOVE_DELAY) {
-    lastMove = now;
-    xOffset++;
+  if (joyX > 900 && xOffset < BOARD_WIDTH - getShapeWidth() && (now - lastMove) > MOVE_DELAY) {
+    if (canMove(false)) {
+      lastMove = now;
+      xOffset++;
+    }
   }
 
   // down
-  if (yOffset < lastYoffset && !(joyY > 280 && joyY < 310)) {
+  if (yOffset < lastYoffset && !(joyY > 490 && joyY < 520)) {
     return;
   }
-  
+
   lastYoffset = yOffset;
-  if (joyY > 500 && lastDown - now > DOWN_DELAY) {
+  if (joyY > 1000 && lastDown - now > DOWN_DELAY) {
     stamp -= level;
     lastDown = now;
   }
@@ -310,6 +322,15 @@ void setup() {
   shapeColors[SHAPE_S] = SHAPE_S_COLOR;
   shapeColors[SHAPE_T] = SHAPE_T_COLOR;
   shapeColors[SHAPE_Z] = SHAPE_Z_COLOR;
+
+  for (byte i = 0; i < BOARD_WIDTH; i++) {
+    for (byte j = 0; j < BOARD_HEIGHT; j++) {
+      fillBlock(i, j, COLOR_BLACK);
+    }
+  }
+
+  Serial.begin(9600);
+  while (!Serial);
 
   drawGrid();
   nextShape();

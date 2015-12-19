@@ -173,7 +173,7 @@ void nextShape() {
   yOffset = -4;
   xOffset = 0;
   currentRotation = 0;
-  currentShape = SHAPE_I; //random(SHAPE_COUNT);
+  currentShape = random(SHAPE_COUNT);
 }
 
 void tftPrint(int x, int y, String message) {

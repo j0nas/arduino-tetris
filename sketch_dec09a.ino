@@ -205,7 +205,6 @@ void gravity(bool apply) {
     }
   }
 
-
   if (xOffset != lastXoffset) {
     lastXoffset = xOffset;
   }

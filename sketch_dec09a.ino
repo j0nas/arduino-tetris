@@ -60,6 +60,8 @@
 
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 byte currentShape = 0;
+byte currentRotation = 0;
+
 short yOffset = -4;
 short xOffset = 0;
 short lastY = -4;
@@ -71,42 +73,68 @@ unsigned long lastDown = 0;
 
 uint16_t grid[BOARD_WIDTH][BOARD_HEIGHT];
 uint16_t shapeColors[SHAPE_COUNT];
-const byte shapes[SHAPE_COUNT][4] = {
+const byte shapes[SHAPE_COUNT][2][4] = {
   {
-    B0100,
-    B0100,
-    B0100,
-    B0100
-  }, {
-    B0000,
-    B0010,
-    B0010,
-    B0110
-  }, {
-    B0000,
-    B0100,
-    B0100,
-    B0110
-  }, {
-    B0000,
-    B0000,
-    B0110,
-    B0110
-  }, {
-    B0000,
-    B0000,
-    B0110,
-    B1100
-  }, {
-    B0000,
-    B0000,
-    B0010,
-    B0111
-  }, {
-    B0000,
-    B0000,
-    B0110,
-    B0011
+    {
+      B1000,
+      B1000,
+      B1000,
+      B1000
+    },
+    {
+      B0000,
+      B1111,
+      B0000,
+      B0000
+    }
+  },
+  {
+    {
+      B0000,
+      B0100,
+      B0100,
+      B1100
+    }
+  },
+  {
+    {
+      B0000,
+      B1000,
+      B1000,
+      B1100
+    }
+  },
+  {
+    {
+      B0000,
+      B0000,
+      B1100,
+      B1100
+    }
+  },
+  {
+    {
+      B0000,
+      B0000,
+      B0110,
+      B1100
+    }
+  },
+  {
+    {
+      B0000,
+      B0000,
+      B0100,
+      B1110
+    }
+  },
+  {
+    {
+      B0000,
+      B0000,
+      B1100,
+      B0110
+    }
   }
 };
 
@@ -123,14 +151,21 @@ byte getNthBit(byte c, byte n) {
   return ((c & (1 << n)) >> n);
 }
 
-bool yOffsetAtBottom() { // TODO: compensate for orientation
-  return (4 + yOffset) >= BOARD_HEIGHT;
+bool yOffsetAtBottom() {
+  for (int i = 3; i != 0; i--) {
+    for (int j = 3; j != 0; j--) {
+      if (getNthBit(shapes[currentShape][currentRotation][i], j) == 1) {
+        return (i + 1 + yOffset) >= BOARD_HEIGHT;
+      }
+    }
+  }
 }
 
 void nextShape() {
   yOffset = -4;
   xOffset = 0;
-  currentShape = random(SHAPE_COUNT);
+  currentRotation = 0;
+  currentShape = SHAPE_I; //random(SHAPE_COUNT);
 }
 
 void gameOver() {
@@ -161,18 +196,33 @@ void gameOver() {
   }
 }
 
-bool isShapeColliding(byte shapeNumber, int xPos, int yPos) {
-  if (shapeNumber == SHAPE_Z && grid[xPos + 2][yPos + 3] != COLOR_BLACK) {
-    return true;
+bool isShapeColliding() {
+  short p[4];
+  short shiftedUp[4];
+
+  for (byte i = 0; i < 3; i++) {
+    shiftedUp[i] = shapes[currentShape][currentRotation][i + 1];
+  }
+  shiftedUp[3] = 0;
+
+  for (byte i = 0; i < 4; i++) {
+    p[i] = shapes[currentShape][currentRotation][i] - (shapes[currentShape][currentRotation][i] & shiftedUp[i]);
   }
 
   for (byte i = 0; i < 4; i++) {
-    if ((getNthBit(shapes[shapeNumber][3], i) == 1) && (grid[xPos + i][yPos + 4] != COLOR_BLACK)) {
-      if (yPos < -1) {
-        gameOver();
+    byte x = 0;
+    for (short j = 3; j != -1; j--) {
+      if (getNthBit(p[i], j) == 1) {
+        if (grid[xOffset + x][yOffset + i + 1] != COLOR_BLACK) {
+          if (yOffset < -1) {
+            gameOver();
+          }
+
+          return true;
+        }
       }
 
-      return true;
+      x++;
     }
   }
 
@@ -180,7 +230,7 @@ bool isShapeColliding(byte shapeNumber, int xPos, int yPos) {
 }
 
 void detectCurrentShapeCollision() {
-  if (yOffsetAtBottom() || isShapeColliding(currentShape, xOffset, yOffset)) {
+  if (yOffsetAtBottom() || isShapeColliding()) {
     nextShape();
   }
 }
@@ -190,9 +240,9 @@ void gravity(bool apply) {
 
   for (byte k = 0; k < 2; k++) {
     for (byte i = 0; i < 4; i++) {
-      int x = 0;
-      for (byte j = 0; j != 4; j++) {
-        if (getNthBit(shapes[currentShape][i], j) == 1) {
+      byte x = 0;
+      for (short j = 3; j != -1; j--) {
+        if (getNthBit(shapes[currentShape][currentRotation][i], j) == 1) {
           fillBlock((k == 0 ? lastXoffset : xOffset) + x, yOffset + i, k == 0 ? COLOR_BLACK : getCurrentShapeColor());
         }
 
@@ -220,29 +270,38 @@ void drawGrid() {
   }
 }
 
-short getShapeLeftWidth() {
-  switch (currentShape) {
-    case SHAPE_I:
-      return -2;
-    case SHAPE_S:
-      return -1;
+byte getShapeWidth() {
+  static byte lastShape = currentShape;
+  static byte lastWidth = 0;
+  
+  if (currentShape == lastShape && lastWidth != 0) {
+    // If shape hasn't changed, return cached value.
+    return lastWidth;
+  } else {
+    lastWidth = 0;
+    lastShape = currentShape;
+  }
+  
+  for (byte i = 0; i < 4; i++) {
+    byte x = 0;
+    for (short j = 3; j != -1; j--) {
+      if (getNthBit(shapes[currentShape][currentRotation][i], j) == 1) {
+        if (j == 0) {
+          // Found largest possible value.
+          lastWidth = 4;
+          return 4;
+        }
 
-    case SHAPE_J:
-    case SHAPE_L:
-    case SHAPE_O:
-      return -1;
+        if ((x + 1) > lastWidth) {
+          lastWidth = x + 1;
+        }
+      }
 
-    case SHAPE_T:
-      return 0;
-
-    case SHAPE_Z:
-      return 0;
+      x++;
+    }
   }
 
-}
-
-byte getShapeWidth() {
-  return currentShape == SHAPE_S ? 4 : 3;
+  return lastWidth;
 }
 
 bool canMove(bool left) {
@@ -250,8 +309,8 @@ bool canMove(bool left) {
   for (byte i = 0; i < 4; i++) {
     predictedShapePositions[i] =
       left ?
-      ((shapes[currentShape][i] >> 1) - (shapes[currentShape][i] & (shapes[currentShape][i] >> 1))) :
-      ((shapes[currentShape][i] << 1) - (shapes[currentShape][i] & (shapes[currentShape][i] << 1)));
+      ((shapes[currentShape][currentRotation][i] >> 1) - (shapes[currentShape][currentRotation][i] & (shapes[currentShape][currentRotation][i] >> 1))) :
+      ((shapes[currentShape][currentRotation][i] << 1) - (shapes[currentShape][currentRotation][i] & (shapes[currentShape][currentRotation][i] << 1)));
   }
 
   for (byte i = 0; i < 4; i++) {
@@ -275,21 +334,22 @@ void joystickMovement() {
 
   static unsigned long lastMove = millis();
   static short lastYoffset = yOffset;
+  static bool hasClicked = false;
 
   // left
-  if (joyX == 0 && xOffset > getShapeLeftWidth() && (now - lastMove) > MOVE_DELAY) {
-    if (canMove(true)) {
+  if (joyX == 0 && xOffset > 0 && (now - lastMove) > MOVE_DELAY) {
+    //if (canMove(true)) {
       lastMove = now;
       xOffset--;
-    }
+    //}
   }
 
   // right
-  if (joyX > 900 && xOffset < BOARD_WIDTH - getShapeWidth() && (now - lastMove) > MOVE_DELAY) {
-    if (canMove(false)) {
+  if (joyX > 900 && xOffset < (BOARD_WIDTH - getShapeWidth()) && (now - lastMove) > MOVE_DELAY) {
+    //if (canMove(false)) {
       lastMove = now;
       xOffset++;
-    }
+    //}
   }
 
   // down
@@ -301,6 +361,33 @@ void joystickMovement() {
   if (joyY > 1000 && lastDown - now > DOWN_DELAY) {
     stamp -= level;
     lastDown = now;
+  }
+
+  // click
+  bool isClicked = (digitalRead(JOY_BTN) == LOW);
+  if (isClicked) {
+    delay(50);
+    isClicked = (digitalRead(JOY_BTN) == LOW);
+  }
+
+  hasClicked = hasClicked && isClicked;
+  if (!hasClicked && isClicked) {
+    hasClicked = true;
+
+    for (byte k = 0; k < 1; k++) {
+      for (byte i = 0; i < 4; i++) {
+        int x = 0;
+        for (short j = 3; j != -1; j--) {
+          if (getNthBit(shapes[currentShape][currentRotation][i], j) == 1) {
+            fillBlock(xOffset + x, yOffset + i, k == 0 ? COLOR_BLACK : getCurrentShapeColor());
+          }
+
+          x++;
+        }
+      }
+
+      currentRotation = currentRotation == 0 ? 1 : 0;
+    }
   }
 }
 

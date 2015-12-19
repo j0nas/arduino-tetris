@@ -81,8 +81,10 @@ unsigned long score = 0;
 
 uint16_t grid[BOARD_WIDTH][BOARD_HEIGHT];
 uint16_t shapeColors[SHAPE_COUNT];
-const byte shapes[SHAPE_COUNT][2][4] = {
-  {
+byte shapeRotations[] = { 2, 4, 4, 1, 2, 4, 2 };
+
+const byte shapes[SHAPE_COUNT][4][4] = {
+  { // SHAPE_I
     {
       B1000,
       B1000,
@@ -96,23 +98,59 @@ const byte shapes[SHAPE_COUNT][2][4] = {
       B0000
     }
   },
-  {
+  { // SHAPE_J
     {
       B0000,
       B0100,
       B0100,
       B1100
+    },
+    {
+      B0000,
+      B0000,
+      B1000,
+      B1110
+    },
+    {
+      B0000,
+      B1100,
+      B1000,
+      B1000
+    },
+    {
+      B0000,
+      B0000,
+      B1110,
+      B0010
     }
   },
-  {
+  { // SHAPE_L
     {
       B0000,
       B1000,
       B1000,
       B1100
+    },
+    {
+      B0000,
+      B0000,
+      B1110,
+      B1000
+    },
+    {
+      B0000,
+      B1100,
+      B0100,
+      B0100
+    },
+    {
+      B0000,
+      B0000,
+      B0010,
+      B1110
     }
   },
-  {
+  { // SHAPE_O
     {
       B0000,
       B0000,
@@ -120,20 +158,44 @@ const byte shapes[SHAPE_COUNT][2][4] = {
       B1100
     }
   },
-  {
+  { // SHAPE_S
     {
       B0000,
-      B0000,
       B0110,
-      B1100
-    }
+      B1100,
+      B0000
+    },
+    {
+      B0000,
+      B1000,
+      B1100,
+      B0100
+    },
   },
-  {
+  { // SHAPE_T
     {
       B0000,
       B0000,
       B0100,
       B1110
+    },
+    {
+      B0000,
+      B0100,
+      B0110,
+      B0100
+    },
+    {
+      B0000,
+      B0000,
+      B1110,
+      B0100
+    },
+    {
+      B0000,
+      B0100,
+      B1100,
+      B0100
     }
   },
   {
@@ -142,6 +204,12 @@ const byte shapes[SHAPE_COUNT][2][4] = {
       B0000,
       B1100,
       B0110
+    },
+    {
+      B0000,
+      B0100,
+      B1100,
+      B1000
     }
   }
 };
@@ -155,14 +223,10 @@ void fillBlock(byte x, byte y, uint16_t color) {
   tft.fillRect(1 + BOARD_OFFSET_X + (x * BLOCK_SIZE), 1 + BOARD_OFFSET_Y + (y * BLOCK_SIZE), BLOCK_SIZE - 1, BLOCK_SIZE - 1, color);
 }
 
-byte getNthBit(byte c, byte n) {
-  return ((c & (1 << n)) >> n);
-}
-
 bool hittingBottom() {
   for (int i = 3; i != 0; i--) {
     for (int j = 3; j != 0; j--) {
-      if (getNthBit(shapes[currentShape][currentRotation][i], j) == 1) {
+      if (bitRead(shapes[currentShape][currentRotation][i], j) == 1) {
         return (i + 1 + yOffset) >= BOARD_HEIGHT;
       }
     }
@@ -231,7 +295,7 @@ bool isShapeColliding() {
   for (byte i = 0; i < 4; i++) {
     byte x = 0;
     for (short j = 3; j != -1; j--) {
-      if (getNthBit(p[i], j) == 1) {
+      if (bitRead(p[i], j) == 1) {
         if (grid[xOffset + x][yOffset + i + 1] != COLOR_BLACK) {
           if (yOffset < -1) {
             gameOver();
@@ -301,7 +365,7 @@ void gravity(bool apply) {
     for (byte i = 0; i < 4; i++) {
       byte x = 0;
       for (short j = 3; j != -1; j--) {
-        if (getNthBit(shapes[currentShape][currentRotation][i], j) == 1) {
+        if (bitRead(shapes[currentShape][currentRotation][i], j) == 1) {
           fillBlock((k == 0 ? lastXoffset : xOffset) + x, yOffset + i, k == 0 ? COLOR_BLACK : getCurrentShapeColor());
         }
 
@@ -346,7 +410,7 @@ byte getShapeWidth() {
   for (byte i = 0; i < 4; i++) {
     byte x = 0;
     for (short j = 3; j != -1; j--) {
-      if (getNthBit(shapes[currentShape][currentRotation][i], j) == 1) {
+      if (bitRead(shapes[currentShape][currentRotation][i], j) == 1) {
         if (j == 0) {
           // Found largest possible value.
           lastWidth = 4;
@@ -377,7 +441,7 @@ bool canMove(bool left) {
   for (byte i = 0; i < 4; i++) {
     byte x = 0;
     for (byte j = 0; j != 4; j++) {
-      if ((getNthBit(predictedShapePositions[i], j) == 1) && (grid[xOffset + x][yOffset + i] != COLOR_BLACK)) {
+      if ((bitRead(predictedShapePositions[i], j) == 1) && (grid[xOffset + x][yOffset + i] != COLOR_BLACK)) {
         return false;
       }
 
@@ -389,11 +453,15 @@ bool canMove(bool left) {
 }
 
 void rotate() {
+  if (shapeRotations[currentShape] == 1) {
+    return;
+  }
+  
   for (byte k = 0; k < 1; k++) {
     for (byte i = 0; i < 4; i++) {
       int x = 0;
       for (short j = 3; j != -1; j--) {
-        if (getNthBit(shapes[currentShape][currentRotation][i], j) == 1) {
+        if (bitRead(shapes[currentShape][currentRotation][i], j) == 1) {
           fillBlock(xOffset + x, yOffset + i, k == 0 ? COLOR_BLACK : getCurrentShapeColor());
         }
 
@@ -401,7 +469,7 @@ void rotate() {
       }
     }
 
-    currentRotation = currentRotation == 0 ? 1 : 0;
+    currentRotation = ((shapeRotations[currentShape] - 1) == currentRotation ? 0 : currentRotation + 1);
   }
 }
 

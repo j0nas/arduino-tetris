@@ -15,48 +15,55 @@
 #define JOY_BTN 2
 
 // Define colors to loosen coupling to screen implementation
-#define COLOR_GRAY      tft.Color565(66, 66, 66)
-#define COLOR_WHITE     ST7735_WHITE
-#define COLOR_BLACK     ST7735_BLACK
-#define COLOR_CYAN      ST7735_CYAN
-#define COLOR_YELLOW    ST7735_YELLOW
-#define COLOR_BLUE      ST7735_BLUE
-#define COLOR_ORANGE    tft.Color565(255, 165, 0)
-#define COLOR_LIME      tft.Color565(204, 255, 0)
-#define COLOR_PURPLE    tft.Color565(128,0,128)
-#define COLOR_RED       ST7735_RED
+#define COLOR_GRAY        tft.Color565(66, 66, 66)
+#define COLOR_WHITE       ST7735_WHITE
+#define COLOR_BLACK       ST7735_BLACK
+#define COLOR_CYAN        ST7735_CYAN
+#define COLOR_YELLOW      ST7735_YELLOW
+#define COLOR_BLUE        ST7735_BLUE
+#define COLOR_ORANGE      tft.Color565(255, 165, 0)
+#define COLOR_LIME        tft.Color565(204, 255, 0)
+#define COLOR_PURPLE      tft.Color565(128,0,128)
+#define COLOR_RED         ST7735_RED
 
 #define BOARD_COLOR       COLOR_GRAY
 #define BACKGROUND_COLOR  COLOR_BLACK
 
-#define BOARD_WIDTH     10
-#define BOARD_HEIGHT    20
-#define BOARD_OFFSET_X  2
-#define BOARD_OFFSET_Y  17
+#define BOARD_WIDTH       10
+#define BOARD_HEIGHT      20
+#define BOARD_OFFSET_X    2
+#define BOARD_OFFSET_Y    17
 
-#define MIN(X, Y)       (((X) < (Y)) ? (X) : (Y))
-#define BLOCK_SIZE      MIN((tft.width() - 1) / BOARD_WIDTH, (tft.height() - 1) / BOARD_HEIGHT)
+#define GAMEOVER_X        90
+#define GAMEOVER_Y        20
 
-#define SHAPE_COUNT     7
+#define SCORE_X           GAMEOVER_X
+#define SCORE_Y           GAMEOVER_Y + 50
+#define LINE_SCORE_VALUE  100
 
-#define SHAPE_I         0
-#define SHAPE_J         1
-#define SHAPE_L         2
-#define SHAPE_O         3
-#define SHAPE_S         4
-#define SHAPE_T         5
-#define SHAPE_Z         6
+#define MIN(X, Y)         (((X) < (Y)) ? (X) : (Y))
+#define BLOCK_SIZE        MIN((tft.width() - 1) / BOARD_WIDTH, (tft.height() - 1) / BOARD_HEIGHT)
 
-#define SHAPE_I_COLOR   COLOR_CYAN
-#define SHAPE_J_COLOR   COLOR_BLUE
-#define SHAPE_L_COLOR   COLOR_ORANGE
-#define SHAPE_O_COLOR   COLOR_YELLOW
-#define SHAPE_S_COLOR   COLOR_LIME
-#define SHAPE_T_COLOR   COLOR_PURPLE
-#define SHAPE_Z_COLOR   COLOR_RED
+#define SHAPE_COUNT       7
 
-#define MOVE_DELAY 85
-#define DOWN_DELAY 150
+#define SHAPE_I           0
+#define SHAPE_J           1
+#define SHAPE_L           2
+#define SHAPE_O           3
+#define SHAPE_S           4
+#define SHAPE_T           5
+#define SHAPE_Z           6
+
+#define SHAPE_I_COLOR     COLOR_CYAN
+#define SHAPE_J_COLOR     COLOR_BLUE
+#define SHAPE_L_COLOR     COLOR_ORANGE
+#define SHAPE_O_COLOR     COLOR_YELLOW
+#define SHAPE_S_COLOR     COLOR_LIME
+#define SHAPE_T_COLOR     COLOR_PURPLE
+#define SHAPE_Z_COLOR     COLOR_RED
+
+#define MOVE_DELAY        85
+#define DOWN_DELAY        150
 
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 byte currentShape = 0;
@@ -70,6 +77,7 @@ short lastX = 0;
 short level = 300;
 unsigned long stamp = 0;
 unsigned long lastDown = 0;
+unsigned long score = 0;
 
 uint16_t grid[BOARD_WIDTH][BOARD_HEIGHT];
 uint16_t shapeColors[SHAPE_COUNT];
@@ -151,7 +159,7 @@ byte getNthBit(byte c, byte n) {
   return ((c & (1 << n)) >> n);
 }
 
-bool yOffsetAtBottom() {
+bool hittingBottom() {
   for (int i = 3; i != 0; i--) {
     for (int j = 3; j != 0; j--) {
       if (getNthBit(shapes[currentShape][currentRotation][i], j) == 1) {
@@ -168,11 +176,20 @@ void nextShape() {
   currentShape = SHAPE_I; //random(SHAPE_COUNT);
 }
 
+void tftPrint(int x, int y, String message) {
+  tft.setCursor(x, y);
+  tft.print(message);
+}
+
+void redrawScore() {
+  tft.fillRect(SCORE_X, SCORE_Y + 10, 40, 10, COLOR_BLACK);
+  tftPrint(SCORE_X, SCORE_Y + 10, String(score));
+}
+
 void gameOver() {
-  tft.setCursor(90, 20);
-  tft.print("GAME");
-  tft.setCursor(90, 30);
-  tft.print("OVER");
+  tftPrint(GAMEOVER_X, GAMEOVER_Y, "GAME");
+  tftPrint(GAMEOVER_X, GAMEOVER_Y + 10, "OVER");
+  
   while (true) {
     bool isClicked = (digitalRead(JOY_BTN) == LOW);
     if (isClicked) {
@@ -188,6 +205,8 @@ void gameOver() {
         }
       }
 
+      score = 0;
+      redrawScore();
       nextShape();
       break;
     }
@@ -230,8 +249,48 @@ bool isShapeColliding() {
 }
 
 void detectCurrentShapeCollision() {
-  if (yOffsetAtBottom() || isShapeColliding()) {
+  if (hittingBottom() || isShapeColliding()) {
+    checkForTetris();
     nextShape();
+  }
+}
+
+void checkForTetris() {
+  bool foundScore = false;
+  byte rowsPastFirstMatching = 0;
+  for (byte row = 0; row < BOARD_HEIGHT; row++) {
+    // Tiny optimization: no need to scan more than four rows for line clears
+    if (foundScore && (++rowsPastFirstMatching > 4)) {
+      return;
+    }
+
+    for (byte col = 0; col < BOARD_WIDTH; col++) {
+      if (grid[col][row] == COLOR_BLACK) {
+        break;
+      }
+
+      // If detected full line
+      if (col == (BOARD_WIDTH - 1)) {
+        score += LINE_SCORE_VALUE;
+        foundScore = true;
+
+        for (byte i = 0; i < BOARD_WIDTH; i++) {
+          fillBlock(i, row, COLOR_BLACK);
+        }
+
+        for (byte r = row; r > 1; r--) {
+          for (byte c = 0; c < BOARD_WIDTH; c++) {
+            swap(grid[c][r], grid[c][r - 1]);
+            fillBlock(c, r, grid[c][r]);
+          }
+        }
+
+      }
+    }
+  }
+
+  if (foundScore) {
+    redrawScore();
   }
 }
 
@@ -272,16 +331,18 @@ void drawGrid() {
 
 byte getShapeWidth() {
   static byte lastShape = currentShape;
+  static byte lastRotation = currentRotation;
   static byte lastWidth = 0;
-  
-  if (currentShape == lastShape && lastWidth != 0) {
+
+  if (currentShape == lastShape && lastRotation == currentRotation && lastWidth != 0) {
     // If shape hasn't changed, return cached value.
     return lastWidth;
   } else {
     lastWidth = 0;
     lastShape = currentShape;
+    lastRotation = currentRotation;
   }
-  
+
   for (byte i = 0; i < 4; i++) {
     byte x = 0;
     for (short j = 3; j != -1; j--) {
@@ -327,6 +388,23 @@ bool canMove(bool left) {
   return true;
 }
 
+void rotate() {
+  for (byte k = 0; k < 1; k++) {
+    for (byte i = 0; i < 4; i++) {
+      int x = 0;
+      for (short j = 3; j != -1; j--) {
+        if (getNthBit(shapes[currentShape][currentRotation][i], j) == 1) {
+          fillBlock(xOffset + x, yOffset + i, k == 0 ? COLOR_BLACK : getCurrentShapeColor());
+        }
+
+        x++;
+      }
+    }
+
+    currentRotation = currentRotation == 0 ? 1 : 0;
+  }
+}
+
 void joystickMovement() {
   int joyX = analogRead(JOY_X);
   int joyY = analogRead(JOY_Y);
@@ -339,16 +417,16 @@ void joystickMovement() {
   // left
   if (joyX == 0 && xOffset > 0 && (now - lastMove) > MOVE_DELAY) {
     //if (canMove(true)) {
-      lastMove = now;
-      xOffset--;
+    lastMove = now;
+    xOffset--;
     //}
   }
 
   // right
   if (joyX > 900 && xOffset < (BOARD_WIDTH - getShapeWidth()) && (now - lastMove) > MOVE_DELAY) {
     //if (canMove(false)) {
-      lastMove = now;
-      xOffset++;
+    lastMove = now;
+    xOffset++;
     //}
   }
 
@@ -373,21 +451,7 @@ void joystickMovement() {
   hasClicked = hasClicked && isClicked;
   if (!hasClicked && isClicked) {
     hasClicked = true;
-
-    for (byte k = 0; k < 1; k++) {
-      for (byte i = 0; i < 4; i++) {
-        int x = 0;
-        for (short j = 3; j != -1; j--) {
-          if (getNthBit(shapes[currentShape][currentRotation][i], j) == 1) {
-            fillBlock(xOffset + x, yOffset + i, k == 0 ? COLOR_BLACK : getCurrentShapeColor());
-          }
-
-          x++;
-        }
-      }
-
-      currentRotation = currentRotation == 0 ? 1 : 0;
-    }
+    rotate();
   }
 }
 
@@ -414,6 +478,9 @@ void setup() {
       fillBlock(i, j, COLOR_BLACK);
     }
   }
+
+  tftPrint(SCORE_X, SCORE_Y, "SCORE");
+  tftPrint(SCORE_X, SCORE_Y + 10, "0");
 
   Serial.begin(9600);
   while (!Serial);

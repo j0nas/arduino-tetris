@@ -9,6 +9,7 @@
 #define TFT_CS            10  // Chip select line for TFT display
 #define TFT_DC            9   // Data/command line for TFT
 #define TFT_RST           8   // Reset line for TFT (or connect to +5V)
+#define SD_CS             4
 
 #define JOY_X             A0
 #define JOY_Y             A1
@@ -44,7 +45,6 @@
 #define SHAPE_T           5
 #define SHAPE_Z           6
 
-// Define colors to loosen coupling to screen implementation
 #define COLOR_GRAY        tft.Color565(33, 33, 33)
 #define COLOR_WHITE       ST7735_WHITE
 #define COLOR_BLACK       ST7735_BLACK
@@ -64,7 +64,11 @@
 #define SHAPE_T_COLOR     COLOR_PURPLE
 #define SHAPE_Z_COLOR     COLOR_RED
 
+#define FILE_NAME         "highscores.txt"
+
 #define MOVE_DELAY        50
 #define DOWN_DELAY        150
 
+#define NEXTSHAPE_X       GAMEOVER_X
+#define NEXTSHAPE_Y       SCORE_Y + 50
 #endif

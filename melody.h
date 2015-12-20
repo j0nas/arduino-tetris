@@ -3,6 +3,11 @@
 
 #include "pitches.h"
 
+/*
+ * https://github.com/electricmango/Arduino-Music-Project/blob/master/A_Theme___Tetris_with_Bass/A_Theme___Tetris_with_Bass.ino
+ * By Github user electricmango under Creative Commons (CC BY-SA 4.0)
+ * Sourced 20-12-15
+ */
 const unsigned short melody[] PROGMEM = {
   NOTE_E5, NOTE_E3, NOTE_B4, NOTE_C5, NOTE_D5, NOTE_E5, NOTE_D5, NOTE_C5,
   NOTE_B4, NOTE_A4, NOTE_A3, NOTE_A4, NOTE_C5, NOTE_E5, NOTE_A3, NOTE_D5,

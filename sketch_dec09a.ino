@@ -367,8 +367,6 @@ void setup() {
   drawGrid();
   nextShape();
   stamp = millis();
-
-  Serial.println(sizeof(melody));
 }
 
 void loop() {

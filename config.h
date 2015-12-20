@@ -45,7 +45,7 @@
 #define SHAPE_Z           6
 
 // Define colors to loosen coupling to screen implementation
-#define COLOR_GRAY        tft.Color565(66, 66, 66)
+#define COLOR_GRAY        tft.Color565(33, 33, 33)
 #define COLOR_WHITE       ST7735_WHITE
 #define COLOR_BLACK       ST7735_BLACK
 #define COLOR_CYAN        ST7735_CYAN

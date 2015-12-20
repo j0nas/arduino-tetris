@@ -46,19 +46,18 @@ void nextShape() {
   currentShape = random(SHAPE_COUNT);
 }
 
-void tftPrint(int x, int y, String message) {
-  tft.setCursor(x, y);
-  tft.print(message);
-}
 
 void redrawScore() {
   tft.fillRect(SCORE_X, SCORE_Y + 10, 40, 10, COLOR_BLACK);
-  tftPrint(SCORE_X, SCORE_Y + 10, String(score));
+  tft.setCursor(SCORE_X, SCORE_Y + 10);
+  tft.print(score);
 }
 
 void gameOver() {
-  tftPrint(GAMEOVER_X, GAMEOVER_Y, "GAME");
-  tftPrint(GAMEOVER_X, GAMEOVER_Y + 10, "OVER");
+  tft.setCursor(GAMEOVER_X, GAMEOVER_Y);
+  tft.print("GAME");
+  tft.setCursor(GAMEOVER_X, GAMEOVER_Y + 10);
+  tft.print("OVER");
 
   while (true) {
     bool isClicked = (digitalRead(JOY_BTN) == LOW);
@@ -75,9 +74,8 @@ void gameOver() {
         }
       }
 
-      
-      redrawScore();
       score = 0;
+      redrawScore();
       nextShape();
       break;
     }
@@ -285,12 +283,14 @@ void joystickMovement() {
   int joyY = analogRead(JOY_Y);
   unsigned long now = millis();
 
-  static unsigned long lastMove = millis();
+  Serial.println(joyX);
+
+  static unsigned long lastMove = now;
   static short lastYoffset = yOffset;
   static bool hasClicked = false;
 
   // left
-  if (joyX < 50 && xOffset > 0 && (now - lastMove) > MOVE_DELAY) {
+  if (joyX < 490 && xOffset > 0 && (now - lastMove) > (MOVE_DELAY + (joyX < 10 ? 0 : MOVE_DELAY * 5))) {
     if (canMove(true)) {
       lastMove = now;
       xOffset--;
@@ -298,7 +298,7 @@ void joystickMovement() {
   }
 
   // right
-  if (joyX > 900 && xOffset < (BOARD_WIDTH - getShapeWidth()) && (now - lastMove) > MOVE_DELAY) {
+  if (joyX > 520 && xOffset < (BOARD_WIDTH - getShapeWidth()) && (now - lastMove) > (MOVE_DELAY + (joyX > 1015 ? 0 : MOVE_DELAY * 5))) {
     if (canMove(false)) {
       lastMove = now;
       xOffset++;
@@ -353,9 +353,11 @@ void setup() {
       fillBlock(i, j, COLOR_BLACK);
     }
   }
-
-  tftPrint(SCORE_X, SCORE_Y, "SCORE");
-  tftPrint(SCORE_X, SCORE_Y + 10, "0");
+  
+  tft.setCursor(SCORE_X, SCORE_Y);
+  tft.print("SCORE");
+  tft.setCursor(SCORE_X, SCORE_Y + 10);
+  tft.print("0");
 
   Serial.begin(9600);
   while (!Serial);

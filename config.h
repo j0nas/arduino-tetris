@@ -62,7 +62,7 @@
 #define SHAPE_T_COLOR     COLOR_PURPLE
 #define SHAPE_Z_COLOR     COLOR_RED
 
-#define MOVE_DELAY        85
+#define MOVE_DELAY        50
 #define DOWN_DELAY        150
 
 #endif

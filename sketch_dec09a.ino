@@ -1,5 +1,5 @@
-//#include <SPI.h>
-//#include <SD.h>
+#include <SPI.h>
+#include <SD.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7735.h>
 
@@ -93,13 +93,13 @@ void saveScore() {
   if (!saveScores) {
     return;
   }
-  /*
-    File f = SD.open(FILE_NAME, FILE_WRITE);
-    if (f) {
-      f.println(score);
-      f.close();
-      Serial.println("Saved score.");
-    }*/
+
+  File f = SD.open(FILE_NAME, FILE_WRITE);
+  if (f) {
+    f.println(score);
+    f.close();
+    Serial.println("Saved score.");
+  }
 }
 
 void gameOver() {
@@ -111,7 +111,6 @@ void gameOver() {
   saveScore();
   waitForClick();
 
-  // TODO: fillrect, then draw grid instead?
   tft.fillRect(90, 20, 25, 20, COLOR_BLACK);
   for (byte i = 0; i < BOARD_WIDTH; i++) {
     for (byte j = 0; j < BOARD_HEIGHT; j++) {
@@ -208,13 +207,10 @@ void gravity(bool apply) {
 
   for (byte k = 0; k < 2; k++) {
     for (byte i = 0; i < 4; i++) {
-      byte x = 0;
-      for (short j = 3; j != -1; j--) {
+      for (short j = 3, x = 0; j != -1; j--, x++) {
         if (bitRead(shapes[currentShape][currentRotation][i], j) == 1) {
           fillBlock((k == 0 ? lastXoffset : xOffset) + x, yOffset + i, k == 0 ? COLOR_BLACK : getCurrentShapeColor());
         }
-
-        x++;
       }
     }
 
@@ -253,8 +249,7 @@ byte getShapeWidth() {
   }
 
   for (byte i = 0; i < 4; i++) {
-    byte x = 0;
-    for (short j = 3; j != -1; j--) {
+    for (short j = 3, x = 0; j != -1; j--, x++) {
       if (bitRead(shapes[currentShape][currentRotation][i], j) == 1) {
         if (j == 0) {
           // Found largest possible value.
@@ -266,8 +261,6 @@ byte getShapeWidth() {
           lastWidth = x + 1;
         }
       }
-
-      x++;
     }
   }
 
@@ -282,15 +275,12 @@ bool canMove(bool left) {
   }
 
   for (byte i = 0; i < 4; i++) {
-    byte x = 0;
-    for (short j = 3; j != -1; j--) {
+    for (short j = 3, x = 0; j != -1; j--, x++) {
       if ((yOffset + i) >= 0) {
         if ((bitRead(predictedShapePositions[i], j) == 1) && (grid[xOffset + x + (left ? -1 : 1)][yOffset + i] != COLOR_BLACK)) {
           return false;
         }
       }
-
-      x++;
     }
   }
 
@@ -307,12 +297,12 @@ bool canRotate() {
     for (byte i = 0; i < 4; i++) {
       for (short j = 3, x = 0; j != -1; j--, x++) {
         if (bitRead(shapes[currentShape][nextRotation][i], j) == 1) {
-          if ((xOffset + x) >= BOARD_WIDTH) {//(grid) / sizeof(uint16_t)) - 2)) {
+          if ((xOffset + x) >= BOARD_WIDTH) {
             // will rotate off grid
             return false;
           }
 
-          
+
           if (grid[xOffset + x][yOffset + i] != COLOR_BLACK) {
             if (bitRead(shapes[currentShape][currentRotation][i], j) != 1) {
               return false;
@@ -337,13 +327,10 @@ void rotate() {
 
   for (byte k = 0; k < 1; k++) {
     for (byte i = 0; i < 4; i++) {
-      int x = 0;
-      for (short j = 3; j != -1; j--) {
+      for (short j = 3, x = 0; j != -1; j--, x++) {
         if (bitRead(shapes[currentShape][currentRotation][i], j) == 1) {
           fillBlock(xOffset + x, yOffset + i, k == 0 ? COLOR_BLACK : getCurrentShapeColor());
         }
-
-        x++;
       }
     }
 
@@ -413,23 +400,23 @@ void setup() {
 
   Serial.begin(9600);
   while (!Serial);
-  /*
-    if (!SD.begin(SD_CS)) {
+
+  if (!SD.begin(SD_CS)) {
     Serial.println("SD init failed!");
     return;
-    }
+  }
 
 
-    if (!SD.exists(FILE_NAME)) {
+  if (!SD.exists(FILE_NAME)) {
     File f = SD.open(FILE_NAME, FILE_WRITE);
     f.close();
-    }
+  }
 
-    if (!SD.exists(FILE_NAME)) {
+  if (!SD.exists(FILE_NAME)) {
     Serial.print("Couldn't access file on SD card: ");
     Serial.println(FILE_NAME);
     saveScores = false;
-    }*/
+  }
 
   pinMode(JOY_BTN, INPUT_PULLUP);
   pinMode(JOY_X, INPUT);
@@ -455,8 +442,9 @@ void setup() {
   centerWrite("TETRIS", txtYpos, COLOR_RED);
   centerWrite("THE SOVIET", txtYpos + 20, COLOR_WHITE);
   centerWrite("MIND GAME", txtYpos + 30, COLOR_WHITE);
-
   centerWrite("PUSH START", txtYpos + 70, COLOR_WHITE);
+  centerWrite("(c) 1989 Jonas Jensen", txtYpos + 100, COLOR_WHITE);
+
   waitForClick();
   tft.fillScreen(COLOR_BLACK);
 

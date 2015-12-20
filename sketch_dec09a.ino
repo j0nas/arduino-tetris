@@ -307,6 +307,12 @@ bool canRotate() {
     for (byte i = 0; i < 4; i++) {
       for (short j = 3, x = 0; j != -1; j--, x++) {
         if (bitRead(shapes[currentShape][nextRotation][i], j) == 1) {
+          if ((xOffset + x) >= BOARD_WIDTH) {//(grid) / sizeof(uint16_t)) - 2)) {
+            // will rotate off grid
+            return false;
+          }
+
+          
           if (grid[xOffset + x][yOffset + i] != COLOR_BLACK) {
             if (bitRead(shapes[currentShape][currentRotation][i], j) != 1) {
               return false;

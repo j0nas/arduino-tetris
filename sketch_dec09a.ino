@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "shapes.h"
+#include "melody.h"
 
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 byte currentShape = 0;
@@ -11,6 +12,9 @@ short yOffset = -4;
 short xOffset = 0;
 short lastY = -4;
 short lastX = 0;
+
+unsigned long toneStamp = millis();
+unsigned short currentNote = 0;
 
 unsigned short level = 300;
 unsigned int score = 0;
@@ -282,9 +286,7 @@ void joystickMovement() {
   int joyX = analogRead(JOY_X);
   int joyY = analogRead(JOY_Y);
   unsigned long now = millis();
-
-  Serial.println(joyX);
-
+  
   static unsigned long lastMove = now;
   static short lastYoffset = yOffset;
   static bool hasClicked = false;
@@ -365,10 +367,28 @@ void setup() {
   drawGrid();
   nextShape();
   stamp = millis();
+
+  Serial.println(sizeof(melody));
 }
 
 void loop() {
-  if ((millis() - stamp) > level) {
+  unsigned long now = millis();
+  unsigned int noteDuration = 1000 / noteDurations[currentNote];
+  
+  if ((now - toneStamp) > noteDuration) {
+    noTone(BUZZER);
+  }
+  
+  if ((now - toneStamp) > (noteDuration * 1.3)) {
+    toneStamp = now;
+    if (++currentNote > (sizeof(melody) / 2)) {
+      currentNote = 0;
+    }
+    
+    tone(BUZZER, pgm_read_word_near(melody + currentNote), noteDuration);
+  }
+  
+  if ((now - stamp) > level) {
     stamp = millis();
     gravity(true);
   }

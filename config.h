@@ -6,13 +6,15 @@
 // cannot be remapped to alternate pins.  For Arduino Uno,
 // Duemilanove, etc., pin 11 = MOSI, pin 12 = MISO, pin 13 = SCK.
 // #define SD_CS    4  // Chip select line for SD card
-#define TFT_CS  10  // Chip select line for TFT display
-#define TFT_DC  9   // Data/command line for TFT
-#define TFT_RST 8   // Reset line for TFT (or connect to +5V)
+#define TFT_CS            10  // Chip select line for TFT display
+#define TFT_DC            9   // Data/command line for TFT
+#define TFT_RST           8   // Reset line for TFT (or connect to +5V)
 
-#define JOY_X   A0
-#define JOY_Y   A1
-#define JOY_BTN 2
+#define JOY_X             A0
+#define JOY_Y             A1
+#define JOY_BTN           2
+
+#define BUZZER            7
 
 #define BOARD_COLOR       COLOR_GRAY
 #define BACKGROUND_COLOR  COLOR_BLACK
